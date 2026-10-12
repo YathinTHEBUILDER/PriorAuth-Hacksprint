@@ -1,0 +1,14 @@
+{
+  "name": "prior-authorization-assistant-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "prisma:generate": "npm --prefix backend run prisma:generate",
+    "prisma:push": "npm --prefix backend run prisma:push",
+    "prisma:seed": "npm --prefix backend run prisma:seed",
+    "test": "npm --prefix backend test"
+  }
+}

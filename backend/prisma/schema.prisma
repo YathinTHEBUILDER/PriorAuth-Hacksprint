@@ -1,0 +1,282 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  fullName     String
+  organization String    @default("Metro General Health System")
+  role         String    @default("STAFF") // ADMINISTRATOR, DOCTOR, STAFF
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  createdRequests    AuthorizationRequest[] @relation("RequestCreator")
+  assignedRequests   AuthorizationRequest[] @relation("AssignedDoctor")
+  uploadedDocuments  Document[]             @relation("UserDocuments")
+  reviews            RequestReview[]
+  statusChanges      RequestStatusHistory[]
+  notifications      Notification[]
+  auditLogs          AuditLog[]
+}
+
+model Organization {
+  id           String   @id @default(uuid())
+  name         String
+  type         String   @default("HOSPITAL") // HOSPITAL, CLINIC, PRACTICE
+  contactEmail String
+  contactPhone String
+  address      String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  requests     AuthorizationRequest[]
+}
+
+model Patient {
+  id                   String   @id @default(uuid())
+  mrn                  String   @unique
+  firstName            String
+  lastName             String
+  dateOfBirth          String   // YYYY-MM-DD
+  gender               String
+  phone                String
+  email                String?
+  address              String
+  insurancePayerId     String
+  insuranceMemberId    String
+  insuranceGroupNumber String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  payer                Payer    @relation(fields: [insurancePayerId], references: [id])
+  requests             AuthorizationRequest[]
+}
+
+model Payer {
+  id             String   @id @default(uuid())
+  name           String
+  code           String   @unique
+  payerType      String   @default("COMMERCIAL") // COMMERCIAL, MEDICARE, MEDICAID
+  contactPhone   String?
+  electronicId   String?
+  portalUrl      String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  patients       Patient[]
+  requests       AuthorizationRequest[]
+  profiles       PayerRequirementProfile[]
+}
+
+model PayerRequirementProfile {
+  id              String   @id @default(uuid())
+  payerId         String
+  serviceCategory String   // RADIOLOGY, SURGERY, SPECIALTY_DRUG, PHYSICAL_THERAPY, CARDIOLOGY
+  version         String   @default("1.0")
+  isActive        Boolean  @default(true)
+  description     String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  payer           Payer    @relation(fields: [payerId], references: [id], onDelete: Cascade)
+  requirements    PayerRequirement[]
+}
+
+model PayerRequirement {
+  id                    String   @id @default(uuid())
+  profileId             String
+  code                  String
+  name                  String
+  description           String
+  isRequired            Boolean  @default(true)
+  applicabilityRule     String?  // ALL, AGE_OVER_50, CONSERVATIVE_CARE_FAILED, RECURRENT
+  acceptedDocTypes      String   // Comma separated categories
+  validationInstruction String
+  sortOrder             Int      @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  profile               PayerRequirementProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  results               RequestRequirementResult[]
+}
+
+model AuthorizationRequest {
+  id                     String    @id @default(uuid())
+  requestNumber          String    @unique
+  patientId              String
+  payerId                String
+  organizationId         String?
+  createdById            String
+  assignedDoctorId       String?
+  serviceType            String    // RADIOLOGY, SURGERY, SPECIALTY_DRUG, PHYSICAL_THERAPY, CARDIOLOGY
+  requestedService       String
+  cptCodes               String    // JSON array string
+  icd10Codes             String    // JSON array string
+  priority               String    @default("STANDARD") // STANDARD, URGENT, EXPEDITED
+  status                 String    @default("DRAFT") // DRAFT, PROCESSING_DOCUMENTS, MISSING_INFORMATION, READY_FOR_REVIEW, READY_FOR_SUBMISSION, SUBMITTED, PENDING, APPROVED, DENIED, ADDITIONAL_INFO_REQUESTED, CANCELLED
+  completenessScore      Float     @default(0.0)
+  submissionRef          String?
+  isSimulatedSubmission  Boolean   @default(false)
+  notes                  String?
+  requestedStartDate     String?
+  requestedEndDate       String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  patient                Patient                   @relation(fields: [patientId], references: [id])
+  payer                  Payer                     @relation(fields: [payerId], references: [id])
+  organization           Organization?             @relation(fields: [organizationId], references: [id])
+  creator                User                      @relation("RequestCreator", fields: [createdById], references: [id])
+  assignedDoctor         User?                     @relation("AssignedDoctor", fields: [assignedDoctorId], references: [id])
+  clinicalInformation    ClinicalInformation?
+  documents              Document[]
+  extractedFields        ExtractedField[]
+  requirementResults     RequestRequirementResult[]
+  reviews                RequestReview[]
+  statusHistory          RequestStatusHistory[]
+  auditLogs              AuditLog[]
+}
+
+model ClinicalInformation {
+  id                    String   @id @default(uuid())
+  requestId             String   @unique
+  diagnosis             String
+  diagnosisCodes        String   // JSON array
+  symptoms              String   // JSON array
+  clinicalFindings      String
+  previousTreatments    String   // JSON array
+  contraindications     String   // JSON array
+  proposedTreatmentPlan String
+  orderingPhysicianName String
+  orderingPhysicianNpi  String
+  documentDates         String   // JSON array
+  isVerified            Boolean  @default(false)
+  verifiedByUserId      String?
+  verifiedAt            DateTime?
+  notes                 String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  request               AuthorizationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+}
+
+model Document {
+  id               String   @id @default(uuid())
+  requestId        String
+  fileName         String
+  originalName     String
+  mimeType         String
+  fileSize         Int
+  filePath         String
+  category         String   @default("CLINICAL_NOTES")
+  extractionStatus String   @default("PENDING") // PENDING, EXTRACTING, COMPLETED, FAILED, MANUAL_ENTRY
+  extractedText    String?
+  uploadedById     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  request          AuthorizationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  uploadedBy       User?                @relation("UserDocuments", fields: [uploadedById], references: [id])
+  extractedFields  ExtractedField[]
+  requirementResults RequestRequirementResult[]
+}
+
+model ExtractedField {
+  id               String   @id @default(uuid())
+  documentId       String
+  requestId        String
+  fieldName        String
+  fieldValue       String
+  confidence       Float    @default(0.85)
+  sourceSnippet    String
+  isVerified       Boolean  @default(false)
+  verifiedValue    String?
+  verifiedByUserId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  document         Document             @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  request          AuthorizationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+}
+
+model RequestRequirementResult {
+  id                String   @id @default(uuid())
+  requestId         String
+  requirementId     String
+  status            String   @default("MISSING") // COMPLETE, MISSING, NEEDS_REVIEW, NOT_APPLICABLE
+  explanation       String
+  sourceDocumentId  String?
+  recommendedAction String
+  checkedAt         DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  request           AuthorizationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  requirement       PayerRequirement    @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  sourceDocument    Document?            @relation(fields: [sourceDocumentId], references: [id])
+}
+
+model RequestReview {
+  id                String   @id @default(uuid())
+  requestId         String
+  reviewerId        String
+  reviewDecision    String   // APPROVED_FOR_SUBMISSION, CHANGES_REQUESTED, REJECTED
+  reviewNotes       String
+  changesMade       String?  // JSON array or text description
+  validationResults String?  // JSON
+  reviewedAt        DateTime @default(now())
+  createdAt         DateTime @default(now())
+
+  request           AuthorizationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  reviewer          User                 @relation(fields: [reviewerId], references: [id])
+}
+
+model RequestStatusHistory {
+  id           String   @id @default(uuid())
+  requestId    String
+  fromStatus   String?
+  toStatus     String
+  changedById  String
+  changeReason String?
+  notes        String?
+  timestamp    DateTime @default(now())
+
+  request      AuthorizationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  changedBy    User                 @relation(fields: [changedById], references: [id])
+}
+
+model Notification {
+  id               String   @id @default(uuid())
+  userId           String
+  title            String
+  message          String
+  type             String   @default("INFO") // INFO, SUCCESS, WARNING, ALERT
+  relatedRequestId String?
+  isRead           Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id               String   @id @default(uuid())
+  userId           String?
+  eventType        String
+  actionDetails    String
+  ipAddress        String?
+  userAgent        String?
+  relatedRequestId String?
+  createdAt        DateTime @default(now())
+
+  user             User?                 @relation(fields: [userId], references: [id])
+  request          AuthorizationRequest? @relation(fields: [relatedRequestId], references: [id])
+}
