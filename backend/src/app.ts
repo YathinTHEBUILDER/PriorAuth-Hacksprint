@@ -30,8 +30,8 @@ app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 const uploadsDir = path.resolve(process.cwd(), 'uploads');
 app.use('/uploads', express.static(uploadsDir));
 
-// Health check endpoint
-app.get('/api/health', (_req, res) => {
+// Root and Health check endpoints
+app.get(['/', '/health', '/api/health'], (_req, res) => {
   res.json({
     status: 'ok',
     service: 'Prior Authorization Assistant Backend API',
