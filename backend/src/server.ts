@@ -17,7 +17,7 @@ async function startServer() {
       console.log('🏥 Prior Authorization Assistant — Backend API');
       console.log(`🚀 Server running on http://localhost:${PORT}`);
       console.log(`📡 Health check: http://localhost:${PORT}/api/health`);
-      console.log(`⚙️  AI Extraction Mode: ${process.env.AI_API_KEY ? 'Live API Key Configured' : 'Deterministic Clinical NLP (Demo Mode)'}`);
+      console.log(`⚙️  AI Extraction Engine: Groq Multi-Key Failover Pool (${process.env.GROQ_MODEL || 'openai/gpt-oss-120b'})`);
       console.log('====================================================');
     });
 
