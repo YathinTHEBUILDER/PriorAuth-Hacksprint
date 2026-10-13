@@ -3,8 +3,8 @@
 > **Smarter Documentation. Faster Approvals. Better Patient Care.**  
 > A full-stack healthcare platform engineered for healthcare providers to automate clinical document extraction, detect payer guideline gaps, compile compliant prior authorization packets, and track electronic payer adjudication.
 
-🚀 **Live Vercel Application**: [https://care-aprrove.vercel.app/](https://care-aprrove.vercel.app/)  
-💻 **GitHub Repository**: [https://github.com/Swasthik182007/CareAprrove](https://github.com/Swasthik182007/CareAprrove)
+🚀 **Live Vercel Application**:   
+💻 **GitHub Repository**: 
 
 ---
 
