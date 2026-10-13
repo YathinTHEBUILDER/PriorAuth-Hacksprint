@@ -12,15 +12,29 @@ describe('Prior Authorization Assistant - Core Backend Engine Tests', () => {
   let payerId = '';
 
   beforeAll(async () => {
-    // Ensure DB connection and find seeded data
     const user = await prisma.user.findFirst({ where: { role: 'DOCTOR' } });
     if (user) testUserId = user.id;
 
-    const patient = await prisma.patient.findFirst();
-    if (patient) patientId = patient.id;
-
     const payer = await prisma.payer.findFirst({ where: { code: 'BCBS' } });
     if (payer) payerId = payer.id;
+
+    let patient = await prisma.patient.findFirst();
+    if (!patient && payerId) {
+      patient = await prisma.patient.create({
+        data: {
+          mrn: `MRN-TEST-${Date.now()}`,
+          firstName: 'Test',
+          lastName: 'Patient',
+          dateOfBirth: '1985-01-01',
+          gender: 'Female',
+          phone: '(555) 000-0000',
+          address: '100 Health Way',
+          insurancePayerId: payerId,
+          insuranceMemberId: 'TEST-MEM-001',
+        },
+      });
+    }
+    if (patient) patientId = patient.id;
   });
 
   // 1. Authentication & Role-Based Access Control
@@ -161,6 +175,11 @@ describe('Prior Authorization Assistant - Core Backend Engine Tests', () => {
     if (testRequestId) {
       await prisma.authorizationRequest.delete({
         where: { id: testRequestId },
+      });
+    }
+    if (patientId) {
+      await prisma.patient.deleteMany({
+        where: { mrn: { startsWith: 'MRN-TEST-' } },
       });
     }
   });

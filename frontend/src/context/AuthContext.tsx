@@ -23,17 +23,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     async function checkAuth() {
       try {
-        const storedUser = localStorage.getItem('demo_auth_user');
-        if (storedUser) {
-          setUser(JSON.parse(storedUser));
-        } else {
-          const res = await authApi.getMe();
-          setUser(res.user);
-          localStorage.setItem('demo_auth_user', JSON.stringify(res.user));
-        }
+        const res = await authApi.getMe();
+        setUser(res.user);
+        localStorage.setItem('auth_user', JSON.stringify(res.user));
       } catch {
-        setUser(null);
-        localStorage.removeItem('demo_auth_user');
+        const storedUser = localStorage.getItem('auth_user');
+        if (storedUser) {
+          try {
+            setUser(JSON.parse(storedUser));
+          } catch {
+            setUser(null);
+            localStorage.removeItem('auth_user');
+          }
+        } else {
+          setUser(null);
+          localStorage.removeItem('auth_user');
+        }
       } finally {
         setLoading(false);
       }
@@ -44,13 +49,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, pass: string, rememberMe?: boolean) => {
     const res = await authApi.login({ email, password: pass, rememberMe });
     setUser(res.user);
-    localStorage.setItem('demo_auth_user', JSON.stringify(res.user));
+    localStorage.setItem('auth_user', JSON.stringify(res.user));
   };
 
   const register = async (data: any) => {
     const res = await authApi.register(data);
     setUser(res.user);
-    localStorage.setItem('demo_auth_user', JSON.stringify(res.user));
+    localStorage.setItem('auth_user', JSON.stringify(res.user));
   };
 
   const logout = async () => {
@@ -60,7 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // ignore
     } finally {
       setUser(null);
-      localStorage.removeItem('demo_auth_user');
+      localStorage.removeItem('auth_user');
     }
   };
 

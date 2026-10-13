@@ -130,7 +130,7 @@ export const NewRequestPage: React.FC = () => {
         <div className="flex items-center gap-2 mb-2">
           <Sparkles className="w-4 h-4 text-cyan-700" />
           <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-900">
-            Quick Clinical Demonstration Templates
+            Common Clinical Service Templates
           </h4>
         </div>
         <p className="text-xs text-cyan-800 mb-3">

@@ -123,7 +123,7 @@ export const RequestListPage: React.FC = () => {
             <option value="MISSING_INFORMATION">Missing Information</option>
             <option value="READY_FOR_REVIEW">Ready for Review</option>
             <option value="READY_FOR_SUBMISSION">Ready for Submission</option>
-            <option value="SUBMITTED">Submitted (Demo)</option>
+            <option value="SUBMITTED">Submitted</option>
             <option value="APPROVED">Approved</option>
             <option value="DENIED">Denied</option>
             <option value="APPEALING">Appealing</option>

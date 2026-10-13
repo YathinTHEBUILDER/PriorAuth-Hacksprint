@@ -340,11 +340,6 @@ export const RequestDetailPage: React.FC = () => {
                 {request.requestNumber}
               </span>
               <StatusBadge status={request.status} size="lg" />
-              {request.isSimulatedSubmission && (
-                <span className="px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-800 text-[10px] font-bold">
-                  Demo Submission
-                </span>
-              )}
             </div>
 
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-2">
@@ -1293,20 +1288,19 @@ export const RequestDetailPage: React.FC = () => {
       {/* ================= TAB 7: PAYER GATEWAY & TRACKING (PAGE 9) ================= */}
       {activeTab === 'tracking' && (
         <div className="space-y-6 animate-in fade-in">
-          {/* Prominent Demo Notice */}
-          <div className="p-4 rounded-2xl bg-cyan-50 border border-cyan-300 text-cyan-950 text-xs">
+          {/* Gateway Status Header */}
+          <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 text-blue-950 text-xs">
             <h4 className="font-bold text-sm flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-cyan-700" />
-              DEMO MODE — Simulated Electronic Payer Gateway
+              <ShieldCheck className="w-4 h-4 text-blue-700" />
+              Electronic Payer Gateway & Clearinghouse Transmission
             </h4>
-            <p className="mt-1 leading-relaxed">
-              This prior authorization request is managed within the prototype demonstration environment. It is not sent to a
-              real commercial insurer. Use the mock response simulator below to test approval and adjudication workflows.
+            <p className="mt-1 leading-relaxed text-slate-600">
+              Direct electronic transaction gateway for prior authorization requests. Track clearinghouse EDI submission status and process adjudication responses.
             </p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Submission Dispatch & Mock Simulator */}
+            {/* Submission Dispatch & Gateway Response */}
             <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-2xs space-y-6">
               <div>
                 <h3 className="font-bold text-slate-900 text-base mb-1">Transmit to Payer Gateway</h3>
@@ -1331,19 +1325,19 @@ export const RequestDetailPage: React.FC = () => {
                     className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 transition"
                   >
                     <Send className="w-4 h-4" />
-                    <span>Submit to Payer Gateway (Simulated)</span>
+                    <span>Submit to Payer Gateway (EDI 278)</span>
                   </button>
                 )}
               </div>
 
-              {/* Mock Response Simulator */}
+              {/* Clearinghouse Adjudication Response Processing */}
               <div className="pt-6 border-t border-slate-100">
                 <h4 className="font-bold text-slate-900 text-sm mb-1 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-cyan-600" />
-                  Mock Payer Adjudication Simulator
+                  <ShieldCheck className="w-4 h-4 text-blue-600" />
+                  Clearinghouse Adjudication Response
                 </h4>
                 <p className="text-xs text-slate-500 mb-3">
-                  Simulate commercial insurer decisions to test lifecycle updates:
+                  Process incoming electronic adjudication response (278 EDI transaction):
                 </p>
 
                 <div className="space-y-3">

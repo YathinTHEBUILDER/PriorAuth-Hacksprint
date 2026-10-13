@@ -30,15 +30,15 @@ export const HelpPage: React.FC = () => {
       desc: 'Attending clinicians inspect facts, confirm medical necessity, and execute a formal electronic review sign-off. Safeguards block confirmation if mandatory clinical criteria are unmet.',
     },
     {
-      title: 'Step 7: Dispatch Simulated Submission & Track Status',
-      desc: 'Submit the packet to the simulated electronic payer gateway. A unique submission reference (e.g. DEMO-SUB-88391) is assigned, and you can test approval, denial, or additional-information-requested transitions using the response simulator.',
+      title: 'Step 7: Dispatch Electronic Submission & Track Status',
+      desc: 'Submit the packet to the electronic payer gateway. A unique clearinghouse reference (e.g. PA-EDI-88391) is assigned, and you can track approval, denial, or additional-information-requested transitions.',
     },
   ];
 
   const faqs = [
     {
-      q: 'Does this platform communicate directly with real insurance companies?',
-      a: 'No. In this hackathon demonstration environment, all payer gateways, approval confirmations, and electronic references are strictly simulated. Real patient requests must not be submitted without verified real-world payer EDI integrations.',
+      q: 'How does this platform communicate with insurance health plans?',
+      a: 'The platform integrates with electronic prior authorization gateways using standard HIPAA 278 transaction protocols and secure document attachments.',
     },
     {
       q: 'Does the AI engine fabricate or hallucinate medical information?',

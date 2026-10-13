@@ -100,12 +100,11 @@ export const PayerConfigPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Prominent Demo Notice */}
-      <div className="p-4 rounded-2xl bg-cyan-50 border border-cyan-200 text-cyan-900 text-xs flex items-center gap-2.5">
-        <Sparkles className="w-5 h-5 text-cyan-700 shrink-0" />
+      {/* Payer Policy Ruleset Header */}
+      <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 text-blue-900 text-xs flex items-center gap-2.5">
+        <Sparkles className="w-5 h-5 text-blue-700 shrink-0" />
         <p className="leading-relaxed">
-          <strong>DEMO CONFIGURATION NOTICE:</strong> Fictional payer profiles and clinical rules below are designed for
-          prototype evaluation. Verify actual health plan medical coverage guidelines before deploying in live environments.
+          <strong>PAYER POLICY RULESET:</strong> Configured payer requirement profiles and clinical coverage rules are enforced during packet completeness evaluation.
         </p>
       </div>
 

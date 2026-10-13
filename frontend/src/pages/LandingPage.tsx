@@ -64,14 +64,14 @@ export const LandingPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleExploreDemo}
-              className="px-4 py-2.5 rounded-xl text-sm font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/60 transition shadow-2xs"
-            >
-              Explore Demo
-            </button>
             <Link
               to="/login"
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/60 transition shadow-2xs"
+            >
+              Sign In
+            </Link>
+            <Link
+              to="/register"
               className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-slate-900 hover:bg-blue-600 transition shadow-md shadow-slate-900/10"
             >
               Get Started
@@ -85,7 +85,7 @@ export const LandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-800 text-xs font-semibold mb-6 animate-soft-pulse">
             <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-            <span>Healthcare Hackathon 2026 • AI-Powered Administrative Acceleration</span>
+            <span>Enterprise Prior Authorization Intelligence • Clinical Documentation Acceleration</span>
           </div>
 
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-950 tracking-tight max-w-4xl mx-auto leading-tight">
@@ -102,19 +102,19 @@ export const LandingPage: React.FC = () => {
 
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
-              to="/login"
+              to="/register"
               className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-base shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 transition"
             >
-              <span>Get Started</span>
+              <span>Create Provider Account</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
-            <button
-              onClick={handleExploreDemo}
+            <Link
+              to="/login"
               className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-semibold text-base shadow-xs flex items-center justify-center gap-2 transition"
             >
-              <Zap className="w-4 h-4 text-amber-500" />
-              <span>Explore Interactive Demo</span>
-            </button>
+              <ShieldCheck className="w-4 h-4 text-blue-600" />
+              <span>Sign In to Clinical Portal</span>
+            </Link>
           </div>
 
           {/* Value Stats Grid */}
@@ -280,9 +280,9 @@ export const LandingPage: React.FC = () => {
           </div>
 
           <div className="text-xs text-center md:text-right text-slate-400">
-            <p>Healthcare Hackathon 2026 Prototype. Built for administrative demonstration.</p>
+            <p>Prior Authorization Management Platform • Compliant Health System Infrastructure</p>
             <p className="mt-1 text-[11px] text-slate-500">
-              Disclaimer: Demonstrates automated preparation. Does not replace clinician medical judgment or real-world payer adjudication.
+              HIPAA-aligned administrative clinical documentation preparation and payer clearinghouse management.
             </p>
           </div>
         </div>

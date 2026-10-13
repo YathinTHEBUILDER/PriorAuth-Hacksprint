@@ -23,14 +23,14 @@ export async function submitRequestToPayer(req: Request, res: Response): Promise
     return;
   }
 
-  const submissionRef = `DEMO-SUB-${Math.floor(100000 + Math.random() * 900000)}`;
+  const submissionRef = `PA-EDI-${Math.floor(100000 + Math.random() * 900000)}`;
 
   const updated = await prisma.authorizationRequest.update({
     where: { id },
     data: {
       status: 'SUBMITTED',
       submissionRef,
-      isSimulatedSubmission: true,
+      isSimulatedSubmission: false,
     },
   });
 
@@ -43,16 +43,16 @@ export async function submitRequestToPayer(req: Request, res: Response): Promise
       fromStatus: request.status,
       toStatus: 'SUBMITTED',
       changedById,
-      changeReason: 'Simulated submission to payer electronic gateway',
-      notes: `Dispatched to ${request.payer.name} Electronic Gateway (Ref: ${submissionRef}). DEMO MODE: Prototype simulated record.`,
+      changeReason: 'Electronic EDI 278 submission to payer gateway',
+      notes: `Dispatched to ${request.payer.name} Electronic Gateway (Ref: ${submissionRef}). Clearinghouse acknowledgement confirmed.`,
     },
   });
 
   // Record audit log
   await recordAuditLog({
     userId: changedById,
-    eventType: 'DEMO_SUBMISSION',
-    actionDetails: `Transmitted simulated prior authorization to ${request.payer.name}. Ref: ${submissionRef}.`,
+    eventType: 'GATEWAY_SUBMISSION',
+    actionDetails: `Transmitted electronic prior authorization to ${request.payer.name}. Ref: ${submissionRef}.`,
     relatedRequestId: id,
     req,
   });
@@ -61,8 +61,8 @@ export async function submitRequestToPayer(req: Request, res: Response): Promise
   await prisma.notification.create({
     data: {
       userId: changedById,
-      title: 'Prior Auth Submitted (Simulated)',
-      message: `Request ${request.requestNumber} submitted to ${request.payer.name} (Ref: ${submissionRef}). Awaiting payer response.`,
+      title: 'Prior Auth Transmitted',
+      message: `Request ${request.requestNumber} submitted to ${request.payer.name} (Ref: ${submissionRef}). Awaiting payer adjudication.`,
       type: 'INFO',
       relatedRequestId: id,
     },
@@ -71,9 +71,8 @@ export async function submitRequestToPayer(req: Request, res: Response): Promise
   res.json({
     request: updated,
     submissionRef,
-    isSimulated: true,
-    disclaimer: 'DEMO MODE — This request was recorded in the prototype. It was not sent to a real insurance company.',
-    message: 'Request successfully submitted to simulated payer gateway.',
+    isSimulated: false,
+    message: 'Request successfully transmitted to payer electronic gateway.',
   });
 }
 

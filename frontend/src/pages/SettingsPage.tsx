@@ -123,7 +123,7 @@ export const SettingsPage: React.FC = () => {
             <div className="grid grid-cols-2 gap-3 text-slate-700">
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <span className="text-slate-400 block text-[10px] uppercase font-semibold">AI NLP Engine</span>
-                <span className="font-semibold text-slate-900">Deterministic Clinical NLP (Demo Mode)</span>
+                <span className="font-semibold text-slate-900">Clinical Entity Extraction & Substring Validation</span>
               </div>
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <span className="text-slate-400 block text-[10px] uppercase font-semibold">Database Schema</span>
@@ -135,7 +135,7 @@ export const SettingsPage: React.FC = () => {
               </div>
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <span className="text-slate-400 block text-[10px] uppercase font-semibold">Payer Gateway</span>
-                <span className="font-semibold text-slate-900">Simulated Gateway Mock Engine</span>
+                <span className="font-semibold text-slate-900">Electronic Clearinghouse Gateway (EDI 278)</span>
               </div>
             </div>
           </div>

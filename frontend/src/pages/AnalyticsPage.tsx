@@ -170,7 +170,7 @@ export const AnalyticsPage: React.FC = () => {
                 <YAxis stroke="#94a3b8" fontSize={11} />
                 <RechartsTooltip />
                 <Area type="monotone" dataKey="total" stroke="#2563eb" fillOpacity={1} fill="url(#colorTotal)" name="Total Cases" />
-                <Area type="monotone" dataKey="approved" stroke="#10b981" fillOpacity={1} fill="url(#colorApproved)" name="Approved (Demo)" />
+                <Area type="monotone" dataKey="approved" stroke="#10b981" fillOpacity={1} fill="url(#colorApproved)" name="Approved Requests" />
               </AreaChart>
             </ResponsiveContainer>
           </div>

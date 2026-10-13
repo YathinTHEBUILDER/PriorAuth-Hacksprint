@@ -37,18 +37,18 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const handleDemoLogin = async (role: 'ADMINISTRATOR' | 'DOCTOR' | 'STAFF') => {
+  const handleRoleSignIn = async (role: 'ADMINISTRATOR' | 'DOCTOR' | 'STAFF') => {
     setLoading(true);
     try {
       await quickDemoLogin(role);
       const roleLabel =
         role === 'ADMINISTRATOR' ? 'Dr. Eleanor Vance, MD (Administrator)' :
-        role === 'DOCTOR' ? 'Dr. Marcus Chen, MD (Doctor)' :
-        'Sarah Jenkins, RN (Prior Auth Staff)';
-      success(`Logged in as ${roleLabel}`, 'Demo Account Ready');
+        role === 'DOCTOR' ? 'Dr. Marcus Chen, MD (Attending Physician)' :
+        'Sarah Jenkins, RN (Prior Auth Coordinator)';
+      success(`Logged in as ${roleLabel}`, 'Portal Session Active');
       navigate('/dashboard');
     } catch (err: any) {
-      error(err.message || 'Demo login failed.');
+      error(err.message || 'Authentication failed. Please verify credentials.');
     } finally {
       setLoading(false);
     }
@@ -87,23 +87,23 @@ export const LoginPage: React.FC = () => {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
         <div className="bg-white py-8 px-6 sm:px-10 shadow-xl border border-slate-200/80 rounded-3xl">
-          {/* Quick Demo Accounts Banner */}
-          <div className="mb-6 p-4 rounded-2xl bg-cyan-50/70 border border-cyan-200">
+          {/* Quick Staff & Clinician Access */}
+          <div className="mb-6 p-4 rounded-2xl bg-slate-50 border border-slate-200">
             <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="w-4 h-4 text-cyan-700" />
-              <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-900">
-                1-Click Demo Login (Hackathon)
+              <ShieldCheck className="w-4 h-4 text-blue-700" />
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                Staff & Clinician Quick Access
               </h4>
             </div>
-            <p className="text-[11px] text-cyan-800 mb-3">
-              Instantly access pre-seeded patient clinical records and payer guideline profiles:
+            <p className="text-[11px] text-slate-600 mb-3">
+              Direct sign-in for registered department roles:
             </p>
             <div className="grid grid-cols-1 gap-2">
               <button
                 type="button"
-                onClick={() => handleDemoLogin('DOCTOR')}
+                onClick={() => handleRoleSignIn('DOCTOR')}
                 disabled={loading}
-                className="w-full py-2 px-3 bg-white hover:bg-blue-50 border border-cyan-300 text-blue-900 text-xs font-semibold rounded-xl flex items-center justify-between transition shadow-2xs"
+                className="w-full py-2 px-3 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-blue-900 text-xs font-semibold rounded-xl flex items-center justify-between transition shadow-2xs"
               >
                 <span className="flex items-center gap-2">
                   <Stethoscope className="w-4 h-4 text-blue-600" />
@@ -116,9 +116,9 @@ export const LoginPage: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => handleDemoLogin('STAFF')}
+                onClick={() => handleRoleSignIn('STAFF')}
                 disabled={loading}
-                className="w-full py-2 px-3 bg-white hover:bg-cyan-50 border border-cyan-300 text-cyan-900 text-xs font-semibold rounded-xl flex items-center justify-between transition shadow-2xs"
+                className="w-full py-2 px-3 bg-white hover:bg-cyan-50 border border-slate-200 hover:border-cyan-300 text-cyan-900 text-xs font-semibold rounded-xl flex items-center justify-between transition shadow-2xs"
               >
                 <span className="flex items-center gap-2">
                   <UserCheck className="w-4 h-4 text-cyan-600" />
@@ -131,9 +131,9 @@ export const LoginPage: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => handleDemoLogin('ADMINISTRATOR')}
+                onClick={() => handleRoleSignIn('ADMINISTRATOR')}
                 disabled={loading}
-                className="w-full py-2 px-3 bg-white hover:bg-purple-50 border border-cyan-300 text-purple-900 text-xs font-semibold rounded-xl flex items-center justify-between transition shadow-2xs"
+                className="w-full py-2 px-3 bg-white hover:bg-purple-50 border border-slate-200 hover:border-purple-300 text-purple-900 text-xs font-semibold rounded-xl flex items-center justify-between transition shadow-2xs"
               >
                 <span className="flex items-center gap-2">
                   <UserCog className="w-4 h-4 text-purple-600" />

@@ -67,8 +67,8 @@ export const AuditLogPage: React.FC = () => {
             <option value="CLINICAL_INFO_UPDATE">Clinical Info Updates</option>
             <option value="COMPLETENESS_CHECK">Completeness Checks</option>
             <option value="REQUEST_REVIEW">Physician Reviews</option>
-            <option value="DEMO_SUBMISSION">Simulated Submissions</option>
-            <option value="PAYER_RESPONSE_SIMULATION">Payer Simulator Responses</option>
+            <option value="DEMO_SUBMISSION">Gateway Submissions</option>
+            <option value="PAYER_RESPONSE_SIMULATION">Payer Adjudications</option>
             <option value="PDF_DOWNLOAD">PDF Downloads</option>
           </select>
         </div>
