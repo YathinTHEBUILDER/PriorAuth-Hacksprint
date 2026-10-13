@@ -208,6 +208,16 @@ export const requestsApi = {
 
 // ================= DOCUMENTS & EXTRACTION =================
 export const documentsApi = {
+  downloadOriginal: async (documentId: string, fileName: string) => {
+    const response = await fetch(`${API_BASE}/documents/${documentId}/file`, { credentials: 'include' });
+    if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || 'Could not download the original document.');
+    const blobUrl = URL.createObjectURL(await response.blob());
+    const anchor = document.createElement('a');
+    anchor.href = blobUrl;
+    anchor.download = fileName;
+    anchor.click();
+    URL.revokeObjectURL(blobUrl);
+  },
   uploadDocument: (requestId: string, formData: FormData) =>
     request<{ document: any; message: string }>(`/requests/${requestId}/documents`, {
       method: 'POST',
@@ -225,6 +235,11 @@ export const documentsApi = {
 
 // ================= CLINICAL INFO & EXTRACTION =================
 export const clinicalApi = {
+  requestMissingInfo: (requestId: string, fieldName: string, reason: string) =>
+    request<{ message: string }>(`/requests/${requestId}/request-info`, {
+      method: 'POST',
+      body: JSON.stringify({ fieldName, reason }),
+    }),
   updateClinicalInfo: (requestId: string, data: any) =>
     request<{ clinicalInformation: any; completeness: any; message: string }>(`/requests/${requestId}/clinical-information`, {
       method: 'PATCH',
@@ -279,6 +294,20 @@ export const submissionApi = {
     request<any>(`/requests/${requestId}/demo-payer-response`, {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+};
+
+// ================= DENIAL APPEALS =================
+export const appealsApi = {
+  draft: (requestId: string, denialReasonText?: string) =>
+    request<{ appeal: any; evidenceCount: number }>(`/requests/${requestId}/appeal/draft`, {
+      method: 'POST',
+      body: JSON.stringify({ denialReasonText }),
+    }),
+  submit: (requestId: string, appealId: string, draftText: string) =>
+    request<{ appeal: any; isSimulated: boolean; message: string }>(`/requests/${requestId}/appeal/send`, {
+      method: 'POST',
+      body: JSON.stringify({ appealId, draftText }),
     }),
 };
 

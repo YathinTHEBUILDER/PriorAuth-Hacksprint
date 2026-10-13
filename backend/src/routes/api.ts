@@ -12,6 +12,8 @@ import * as subCtrl from '../controllers/submissionController.js';
 import * as notifCtrl from '../controllers/notificationController.js';
 import * as analCtrl from '../controllers/analyticsController.js';
 import * as adminCtrl from '../controllers/adminController.js';
+import * as appealCtrl from '../controllers/appealController.js';
+import * as requestInfoCtrl from '../controllers/requestInfoController.js';
 
 const router = Router();
 
@@ -41,6 +43,7 @@ router.post('/requests', authenticate, reqCtrl.createRequest);
 router.get('/requests/:id', authenticate, reqCtrl.getRequestById);
 router.patch('/requests/:id', authenticate, reqCtrl.updateRequest);
 router.delete('/requests/:id', authenticate, requireRole('ADMINISTRATOR'), reqCtrl.deleteRequest);
+router.post('/requests/:id/request-info', authenticate, requestInfoCtrl.requestMissingInformation);
 
 // ================= DOCUMENTS & EXTRACTION =================
 router.post(
@@ -50,6 +53,7 @@ router.post(
   docCtrl.uploadRequestDocument
 );
 router.get('/requests/:id/documents', authenticate, docCtrl.getRequestDocuments);
+router.get('/documents/:id/file', authenticate, docCtrl.downloadOriginalDocument);
 router.delete('/documents/:id', authenticate, docCtrl.deleteDocument);
 router.post('/documents/:id/extract', authenticate, docCtrl.extractDocumentText);
 
@@ -74,6 +78,8 @@ router.post('/requests/:id/ready-for-submission', authenticate, revCtrl.markRead
 router.post('/requests/:id/submit', authenticate, subCtrl.submitRequestToPayer);
 router.get('/requests/:id/status-history', authenticate, subCtrl.getStatusHistory);
 router.post('/requests/:id/demo-payer-response', authenticate, subCtrl.simulatePayerResponse);
+router.post('/requests/:id/appeal/draft', authenticate, appealCtrl.draftAppeal);
+router.post('/requests/:id/appeal/send', authenticate, appealCtrl.submitAppeal);
 
 // ================= NOTIFICATIONS =================
 router.get('/notifications', authenticate, notifCtrl.getNotifications);

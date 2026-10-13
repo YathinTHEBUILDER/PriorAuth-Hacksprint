@@ -42,16 +42,21 @@ export const DashboardPage: React.FC = () => {
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchFilter, setSearchFilter] = useState('');
+  const [triageRequests, setTriageRequests] = useState<any[]>([]);
+  const [triageStatus, setTriageStatus] = useState('ALL');
+  const [oldestFirst, setOldestFirst] = useState(true);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [sumRes, actRes] = await Promise.all([
+        const [sumRes, actRes, requestRes] = await Promise.all([
           dashboardApi.getSummary(),
           dashboardApi.getActivity(),
+          requestsApi.getRequests(),
         ]);
         setSummary(sumRes);
         setActivities(actRes.activities);
+        setTriageRequests(requestRes.requests);
       } catch (err) {
         console.error('Failed to load dashboard data:', err);
       } finally {
@@ -90,16 +95,17 @@ export const DashboardPage: React.FC = () => {
 
   const pipeline = summary?.pipeline || [];
 
-  const filteredRequests = (summary?.recentRequests || []).filter((r: any) => {
+  const filteredRequests = [...triageRequests].filter((r: any) => {
+    if (triageStatus !== 'ALL' && r.status !== triageStatus) return false;
     if (!searchFilter) return true;
     const q = searchFilter.toLowerCase();
     return (
       r.requestNumber.toLowerCase().includes(q) ||
-      r.patientName.toLowerCase().includes(q) ||
-      r.payerName.toLowerCase().includes(q) ||
+      `${r.patient?.firstName || r.patientName || ''} ${r.patient?.lastName || ''}`.toLowerCase().includes(q) ||
+      (r.payer?.name || r.payerName || '').toLowerCase().includes(q) ||
       r.requestedService.toLowerCase().includes(q)
     );
-  });
+  }).sort((a, b) => (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * (oldestFirst ? 1 : -1));
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
@@ -209,11 +215,11 @@ export const DashboardPage: React.FC = () => {
         <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200/80 shadow-2xs overflow-hidden flex flex-col">
           <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h3 className="font-bold text-slate-900 text-base">Recent Authorization Requests</h3>
-              <p className="text-xs text-slate-500">Live clinical packets undergoing preparation & adjudication</p>
+              <h3 className="font-bold text-slate-900 text-base">Triage Queue</h3>
+              <p className="text-xs text-slate-500">All cases, sorted by time open and filterable by status</p>
             </div>
-            {/* Search Filter */}
-            <div className="relative w-full sm:w-64">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <div className="relative w-full sm:w-56">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <input
                 type="text"
@@ -222,6 +228,12 @@ export const DashboardPage: React.FC = () => {
                 onChange={(e) => setSearchFilter(e.target.value)}
                 className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:border-blue-500"
               />
+            </div>
+            <select aria-label="Filter cases by status" value={triageStatus} onChange={(event) => setTriageStatus(event.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+              <option value="ALL">All statuses</option>
+              {['DRAFT','PROCESSING_DOCUMENTS','MISSING_INFORMATION','READY_FOR_REVIEW','READY_FOR_SUBMISSION','SUBMITTED','PENDING','APPROVED','DENIED','APPEALING'].map((status) => <option value={status} key={status}>{status.replace(/_/g, ' ')}</option>)}
+            </select>
+            <button type="button" onClick={() => setOldestFirst(!oldestFirst)} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">{oldestFirst ? 'Oldest first' : 'Newest first'}</button>
             </div>
           </div>
 
@@ -235,14 +247,15 @@ export const DashboardPage: React.FC = () => {
                   <th className="py-3 px-4">Service / CPT</th>
                   <th className="py-3 px-4">Completeness</th>
                   <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4">Days Open</th>
                   <th className="py-3 px-4 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {filteredRequests.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-400 text-xs">
-                      No matching authorization requests found.
+                    <td colSpan={8} className="py-8 text-center text-slate-400 text-xs">
+                      No cases match these filters.
                     </td>
                   </tr>
                 ) : (
@@ -254,12 +267,12 @@ export const DashboardPage: React.FC = () => {
                     >
                       <td className="py-3.5 px-4 font-mono font-bold text-blue-700">{req.requestNumber}</td>
                       <td className="py-3.5 px-4 font-medium text-slate-900">
-                        {req.patientName}
-                        <span className="block text-[10px] text-slate-400 font-mono">{req.patientMrn}</span>
+                        {req.patient ? `${req.patient.firstName} ${req.patient.lastName}` : req.patientName}
+                        <span className="block text-[10px] text-slate-400 font-mono">{req.patient?.mrn || req.patientMrn}</span>
                       </td>
                       <td className="py-3.5 px-4">
-                        <span className="font-semibold text-slate-800">{req.payerCode}</span>
-                        <span className="block text-[10px] text-slate-400 truncate max-w-[110px]">{req.payerName}</span>
+                        <span className="font-semibold text-slate-800">{req.payer?.code || req.payerCode}</span>
+                        <span className="block text-[10px] text-slate-400 truncate max-w-[110px]">{req.payer?.name || req.payerName}</span>
                       </td>
                       <td className="py-3.5 px-4 max-w-[160px] truncate" title={req.requestedService}>
                         <span className="font-medium text-slate-800">{req.requestedService}</span>
@@ -269,6 +282,9 @@ export const DashboardPage: React.FC = () => {
                       </td>
                       <td className="py-3.5 px-4">
                         <StatusBadge status={req.status} size="sm" />
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-600 font-semibold whitespace-nowrap">
+                        {Math.max(0, Math.floor((Date.now() - new Date(req.createdAt).getTime()) / 86_400_000))} days
                       </td>
                       <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                         <Link
@@ -287,7 +303,7 @@ export const DashboardPage: React.FC = () => {
 
           <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
             <span className="text-xs text-slate-500">
-              Showing {filteredRequests.length} of {metrics.totalRequests} records
+              Showing {filteredRequests.length} of {triageRequests.length} cases
             </span>
             <Link
               to="/requests"

@@ -56,6 +56,11 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'md' })
       dotClass = 'bg-indigo-500';
       label = 'Submitted (Demo)';
       break;
+    case 'APPEALING':
+      bgClass = 'bg-violet-50 text-violet-700 border-violet-200';
+      dotClass = 'bg-violet-500';
+      label = 'Appealing';
+      break;
     case 'PENDING':
       bgClass = 'bg-purple-50 text-purple-700 border-purple-200';
       dotClass = 'bg-purple-500';

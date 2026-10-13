@@ -7,27 +7,10 @@ import prisma from '../prisma.js';
 import { recordAuditLog } from '../middleware/audit.js';
 import { runClinicalExtraction } from '../services/aiService.js';
 import { checkRequestCompleteness } from '../services/completenessService.js';
-
-// Setup upload directory
-const uploadDir = path.resolve(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-// Multer configuration
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `doc-${uniqueSuffix}${ext}`);
-  },
-});
+import { downloadDocument, removeDocument, storageObjectPath, storeDocument } from '../services/storageService.js';
 
 export const uploadMiddleware = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024 }, // 15 MB
   fileFilter: (_req, file, cb) => {
     const allowed = ['.pdf', '.png', '.jpg', '.jpeg'];
@@ -55,17 +38,21 @@ export async function uploadRequestDocument(req: Request, res: Response): Promis
   }
 
   let originalName = file?.originalname || 'Manual_Clinical_Entry.txt';
-  let fileName = file?.filename || `manual-${Date.now()}.txt`;
+  const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+  const fileName = file ? `doc-${uniqueSuffix}${path.extname(file.originalname).toLowerCase()}` : `manual-${uniqueSuffix}.txt`;
   let mimeType = file?.mimetype || 'text/plain';
   let fileSize = file?.size || (manualText ? manualText.length : 0);
-  let filePath = file ? file.path : 'manual_entry';
+  let filePath = 'manual_entry';
   let extractedText = manualText || '';
+
+  if (file) {
+    filePath = await storeDocument(`${requestId}/${fileName}`, file.buffer, file.mimetype || 'application/octet-stream');
+  }
 
   // If PDF file, parse text
   if (file && (file.mimetype === 'application/pdf' || file.originalname.toLowerCase().endsWith('.pdf'))) {
     try {
-      const dataBuffer = fs.readFileSync(file.path);
-      const pdfData = await pdfParse(dataBuffer);
+      const pdfData = await pdfParse(file.buffer);
       extractedText = pdfData.text || '';
     } catch (parseErr) {
       console.warn('PDF parse fallback:', parseErr);
@@ -97,19 +84,23 @@ export async function uploadRequestDocument(req: Request, res: Response): Promis
   });
 
   // Run NLP Extraction
-  if (extractedText && extractedText.trim().length > 10) {
+  if (category !== 'DENIAL_LETTER' && extractedText && extractedText.trim().length > 10) {
     const nlpResult = await runClinicalExtraction(extractedText);
 
     // Save extracted fields
     for (const fact of nlpResult.allFacts) {
+      const sourceOffsetStart = fact.sourceSnippet ? extractedText.indexOf(fact.sourceSnippet) : -1;
+      const sourceOffsetEnd = sourceOffsetStart >= 0 ? sourceOffsetStart + fact.sourceSnippet.length : -1;
       await prisma.extractedField.create({
         data: {
           documentId: doc.id,
           requestId,
           fieldName: fact.fieldName,
           fieldValue: fact.fieldValue,
-          confidence: fact.confidence,
+          confidence: sourceOffsetStart >= 0 ? fact.confidence : Math.min(fact.confidence, 0.55),
           sourceSnippet: fact.sourceSnippet,
+          sourceOffsetStart: sourceOffsetStart >= 0 ? sourceOffsetStart : null,
+          sourceOffsetEnd: sourceOffsetEnd >= 0 ? sourceOffsetEnd : null,
           isVerified: false,
         },
       });
@@ -224,12 +215,11 @@ export async function deleteDocument(req: Request, res: Response): Promise<void>
     return;
   }
 
-  if (fs.existsSync(doc.filePath)) {
-    try {
-      fs.unlinkSync(doc.filePath);
-    } catch (e) {
-      console.warn('Could not remove file on disk:', e);
-    }
+  const objectPath = storageObjectPath(doc.filePath);
+  if (objectPath) {
+    await removeDocument(objectPath);
+  } else if (fs.existsSync(doc.filePath)) {
+    fs.unlinkSync(doc.filePath);
   }
 
   await prisma.document.delete({
@@ -263,14 +253,20 @@ export async function extractDocumentText(req: Request, res: Response): Promise<
   }
 
   let text = doc.extractedText || '';
-  if (!text && fs.existsSync(doc.filePath)) {
+  const objectPath = storageObjectPath(doc.filePath);
+  if (!text && (objectPath || fs.existsSync(doc.filePath))) {
     try {
-      const dataBuffer = fs.readFileSync(doc.filePath);
+      const dataBuffer = objectPath ? await downloadDocument(objectPath) : fs.readFileSync(doc.filePath);
       const pdfData = await pdfParse(dataBuffer);
       text = pdfData.text || '';
     } catch {
       text = 'Sample document clinical content parsed successfully.';
     }
+  }
+
+  if (doc.category === 'DENIAL_LETTER') {
+    res.status(400).json({ error: 'Denial letters are used as appeal context and are not added to chart fact extraction.' });
+    return;
   }
 
   const nlpResult = await runClinicalExtraction(text);
@@ -287,8 +283,10 @@ export async function extractDocumentText(req: Request, res: Response): Promise<
         requestId: doc.requestId,
         fieldName: fact.fieldName,
         fieldValue: fact.fieldValue,
-        confidence: fact.confidence,
+        confidence: fact.sourceSnippet && text.indexOf(fact.sourceSnippet) >= 0 ? fact.confidence : Math.min(fact.confidence, 0.55),
         sourceSnippet: fact.sourceSnippet,
+        sourceOffsetStart: fact.sourceSnippet && text.indexOf(fact.sourceSnippet) >= 0 ? text.indexOf(fact.sourceSnippet) : null,
+        sourceOffsetEnd: fact.sourceSnippet && text.indexOf(fact.sourceSnippet) >= 0 ? text.indexOf(fact.sourceSnippet) + fact.sourceSnippet.length : null,
         isVerified: false,
       },
     });
@@ -314,4 +312,25 @@ export async function extractDocumentText(req: Request, res: Response): Promise<
     extractionResult: nlpResult,
     message: 'Document extraction re-executed successfully.',
   });
+}
+
+export async function downloadOriginalDocument(req: Request, res: Response): Promise<void> {
+  const doc = await prisma.document.findUnique({ where: { id: req.params.id } });
+  if (!doc) {
+    res.status(404).json({ error: 'Document not found.' });
+    return;
+  }
+  const objectPath = storageObjectPath(doc.filePath);
+  if (objectPath) {
+    const content = await downloadDocument(objectPath);
+    res.setHeader('Content-Type', doc.mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(doc.originalName)}`);
+    res.send(content);
+    return;
+  }
+  if (doc.filePath !== 'manual_entry' && fs.existsSync(doc.filePath)) {
+    res.download(doc.filePath, doc.originalName);
+    return;
+  }
+  res.status(404).json({ error: 'No original file is available for this manual text entry.' });
 }

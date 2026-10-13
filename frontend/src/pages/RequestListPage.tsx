@@ -32,7 +32,7 @@ export const RequestListPage: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState(statusParam);
   const [selectedPayer, setSelectedPayer] = useState('ALL');
   const [selectedService, setSelectedService] = useState('ALL');
-  const [sortBy, setSortBy] = useState<'date' | 'completeness' | 'id'>('date');
+  const [sortBy, setSortBy] = useState<'date' | 'completeness' | 'id' | 'days-open'>('date');
 
   useEffect(() => {
     setSelectedStatus(statusParam);
@@ -65,6 +65,7 @@ export const RequestListPage: React.FC = () => {
   const sortedRequests = [...requests].sort((a, b) => {
     if (sortBy === 'completeness') return b.completenessScore - a.completenessScore;
     if (sortBy === 'id') return b.requestNumber.localeCompare(a.requestNumber);
+    if (sortBy === 'days-open') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
@@ -125,6 +126,7 @@ export const RequestListPage: React.FC = () => {
             <option value="SUBMITTED">Submitted (Demo)</option>
             <option value="APPROVED">Approved</option>
             <option value="DENIED">Denied</option>
+            <option value="APPEALING">Appealing</option>
           </select>
         </div>
 
@@ -156,6 +158,7 @@ export const RequestListPage: React.FC = () => {
             <option value="date">Most Recent</option>
             <option value="completeness">Completeness %</option>
             <option value="id">Request ID</option>
+            <option value="days-open">Days Open (oldest first)</option>
           </select>
         </div>
       </div>
@@ -173,19 +176,20 @@ export const RequestListPage: React.FC = () => {
                 <th className="py-3.5 px-4">Completeness</th>
                 <th className="py-3.5 px-4">Status</th>
                 <th className="py-3.5 px-4">Created Date</th>
+                <th className="py-3.5 px-4">Days Open</th>
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                  <td colSpan={9} className="py-12 text-center text-slate-400">
                     Loading requests registry...
                   </td>
                 </tr>
               ) : sortedRequests.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                  <td colSpan={9} className="py-12 text-center text-slate-400">
                     No authorization requests matching the active filters.
                   </td>
                 </tr>
@@ -223,6 +227,9 @@ export const RequestListPage: React.FC = () => {
                     </td>
                     <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
                       {new Date(req.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="py-3.5 px-4 text-slate-600 font-semibold whitespace-nowrap">
+                      {Math.max(0, Math.floor((Date.now() - new Date(req.createdAt).getTime()) / 86_400_000))} days
                     </td>
                     <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1.5">

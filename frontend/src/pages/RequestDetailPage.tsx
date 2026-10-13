@@ -31,6 +31,7 @@ import {
   generationApi,
   reviewApi,
   submissionApi,
+  appealsApi,
 } from '../services/api';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { CompletenessMeter } from '../components/ui/CompletenessMeter';
@@ -70,6 +71,11 @@ export const RequestDetailPage: React.FC = () => {
   // Simulation State
   const [simulatedOutcome, setSimulatedOutcome] = useState<string>('APPROVED');
   const [simulatedNotes, setSimulatedNotes] = useState<string>('');
+  const [denialReasonText, setDenialReasonText] = useState('');
+  const [appealDraft, setAppealDraft] = useState<any>(null);
+  const [appealBusy, setAppealBusy] = useState(false);
+  const [selectedSource, setSelectedSource] = useState<any>(null);
+  const [requestingInfo, setRequestingInfo] = useState(false);
 
   const loadRequest = async (silent = false) => {
     if (!id) return;
@@ -135,6 +141,14 @@ export const RequestDetailPage: React.FC = () => {
       await loadRequest(true);
     } catch (err: any) {
       error(err.message || 'Failed to remove document.');
+    }
+  };
+
+  const handleDownloadDocument = async (docId: string, fileName: string) => {
+    try {
+      await documentsApi.downloadOriginal(docId, fileName);
+    } catch (err: any) {
+      error(err.message || 'Could not download the original document.');
     }
   };
 
@@ -237,6 +251,48 @@ export const RequestDetailPage: React.FC = () => {
     }
   };
 
+  const handleDraftAppeal = async () => {
+    if (!id) return;
+    setAppealBusy(true);
+    try {
+      const result = await appealsApi.draft(id, denialReasonText);
+      setAppealDraft(result.appeal);
+      success(`Draft prepared with ${result.evidenceCount} chart evidence item(s).`);
+      await loadRequest(true);
+    } catch (err: any) {
+      error(err.message || 'Could not draft the appeal.');
+    } finally {
+      setAppealBusy(false);
+    }
+  };
+
+  const handleRequestMissingInfo = async (fieldName: string, reason: string) => {
+    if (!id) return;
+    setRequestingInfo(true);
+    try {
+      const result = await clinicalApi.requestMissingInfo(id, fieldName, reason);
+      success(result.message);
+    } catch (err: any) {
+      error(err.message || 'Could not log the follow-up request.');
+    } finally {
+      setRequestingInfo(false);
+    }
+  };
+
+  const handleSubmitAppeal = async () => {
+    if (!id || !appealDraft?.id) return;
+    setAppealBusy(true);
+    try {
+      const result = await appealsApi.submit(id, appealDraft.id, appealDraft.draftText);
+      success(result.message);
+      await loadRequest(true);
+    } catch (err: any) {
+      error(err.message || 'Could not record appeal submission.');
+    } finally {
+      setAppealBusy(false);
+    }
+  };
+
   if (loading || !request) {
     return (
       <div className="flex flex-col items-center justify-center py-24 space-y-4">
@@ -250,6 +306,8 @@ export const RequestDetailPage: React.FC = () => {
   const payer = request.payer;
   const clinical = request.clinicalInformation;
   const documents = request.documents || [];
+  const sourceDocument = documents.find((document: any) => document.id === selectedSource?.documentId) || documents[0];
+  const sourceText = sourceDocument?.extractedText || '';
   const reqResults = request.requirementResults || [];
   const completeness = request.completeness || {
     score: request.completenessScore,
@@ -268,6 +326,7 @@ export const RequestDetailPage: React.FC = () => {
     { id: 'generate', label: '5. Packet Generator & PDF', icon: FileCheck2 },
     { id: 'review', label: '6. Physician Review', icon: Stethoscope },
     { id: 'tracking', label: '7. Payer Gateway & Tracking', icon: Send },
+    { id: 'appeal', label: '8. Denial Appeal', icon: FileCheck2 },
   ];
 
   return (
@@ -568,6 +627,7 @@ export const RequestDetailPage: React.FC = () => {
                     className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:border-blue-500"
                   >
                     <option value="CLINICAL_NOTES">Clinical Notes & Progress Consults</option>
+                    <option value="DENIAL_LETTER">Payer Denial Letter</option>
                     <option value="DIAGNOSIS_RECORDS">Diagnosis Records</option>
                     <option value="LABORATORY_REPORTS">Laboratory Reports (e.g. TB Gold, CBC)</option>
                     <option value="IMAGING_REPORTS">Imaging Reports (MRI, CT, Plain X-Ray)</option>
@@ -673,13 +733,16 @@ export const RequestDetailPage: React.FC = () => {
                             {doc.category.replace(/_/g, ' ')}
                           </span>
                         </div>
-                        <button
-                          onClick={() => handleDeleteDocument(doc.id)}
-                          className="text-slate-400 hover:text-rose-600 p-1 rounded"
-                          title="Remove document"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          {doc.filePath !== 'manual_entry' && <button type="button" onClick={() => handleDownloadDocument(doc.id, doc.originalName)} className="rounded p-1 text-slate-500 hover:text-blue-600" title="Download original document"><Download className="h-3.5 w-3.5" /></button>}
+                          <button
+                            onClick={() => handleDeleteDocument(doc.id)}
+                            className="text-slate-400 hover:text-rose-600 p-1 rounded"
+                            title="Remove document"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
 
                       <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-200/60">
@@ -879,11 +942,26 @@ export const RequestDetailPage: React.FC = () => {
               </p>
 
               <div className="flex-1 overflow-y-auto bg-slate-900 text-slate-100 p-4 rounded-2xl font-mono text-xs leading-relaxed">
-                {documents.length > 0 && documents[0].extractedText ? (
-                  <pre className="whitespace-pre-wrap">{documents[0].extractedText}</pre>
+                {sourceText ? (
+                  <pre className="whitespace-pre-wrap">{selectedSource && sourceDocument?.id === selectedSource.documentId ? <>{sourceText.slice(0, selectedSource.start)}<mark className="rounded bg-amber-300 px-0.5 text-slate-950">{sourceText.slice(selectedSource.start, selectedSource.end)}</mark>{sourceText.slice(selectedSource.end)}</> : sourceText}</pre>
                 ) : (
                   <span className="text-slate-500">No raw text extracted yet. Upload a PDF in Step 2.</span>
                 )}
+              </div>
+              <div className="mt-4 space-y-2 max-h-56 overflow-y-auto">
+                {(request.extractedFields || []).map((field: any) => (
+                  <div key={field.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-slate-800">{field.fieldName}: {field.fieldValue}</span>
+                      <span className={`rounded-full px-2 py-0.5 font-semibold ${field.sourceOffsetStart != null ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                        {field.sourceOffsetStart != null ? 'Source verified' : 'Review citation'}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-slate-600">{field.sourceSnippet || 'No source text recorded.'}</p>
+                    {field.sourceOffsetStart != null && <p className="mt-1 text-[10px] text-slate-400">{field.documentId} · characters {field.sourceOffsetStart}–{field.sourceOffsetEnd}</p>}
+                    {field.sourceOffsetStart != null && <button type="button" onClick={() => setSelectedSource({ documentId: field.documentId, start: field.sourceOffsetStart, end: field.sourceOffsetEnd })} className="mt-2 font-semibold text-blue-700 hover:underline">View Source</button>}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -990,6 +1068,7 @@ export const RequestDetailPage: React.FC = () => {
                       <p className="text-[11px] font-semibold text-blue-700">
                         Recommended Next Action: {result.recommendedAction}
                       </p>
+                      {isMissing && <button type="button" disabled={requestingInfo} onClick={() => handleRequestMissingInfo(req.name || 'Missing payer requirement', result.recommendedAction || result.explanation || '')} className="mt-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-[11px] font-semibold text-blue-700 disabled:opacity-50">Request from ordering clinician</button>}
                     </div>
                   </div>
                 );
@@ -1367,6 +1446,28 @@ export const RequestDetailPage: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {activeTab === 'appeal' && (
+        <div className="space-y-5 animate-in fade-in">
+          <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-950">
+            Upload a payer denial letter in Documents, or enter its reason below. The draft reuses chart extractions and includes source citations; a clinician must review it before use.
+          </section>
+          <section className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-2xs">
+            <label className="block text-xs font-semibold text-slate-700" htmlFor="denial-reason">Denial reason</label>
+            <textarea id="denial-reason" value={denialReasonText} onChange={(event) => setDenialReasonText(event.target.value)} rows={4} placeholder="Paste the payer's denial rationale, or leave blank to use the uploaded denial letter." className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs" />
+            <button type="button" onClick={handleDraftAppeal} disabled={appealBusy} className="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{appealBusy ? 'Preparing…' : 'Draft appeal with cited evidence'}</button>
+          </section>
+          {(appealDraft || request.appeals?.[0]) && (() => {
+            const appeal = appealDraft || request.appeals?.[0];
+            return <section className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-2xs">
+              <div className="flex items-center justify-between"><h3 className="font-bold text-slate-900">Appeal draft</h3><span className="rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold text-blue-800">{appeal.status}</span></div>
+              <textarea aria-label="Appeal draft text" value={appeal.draftText} onChange={(event) => setAppealDraft({ ...appeal, draftText: event.target.value })} rows={16} className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 font-mono text-xs leading-relaxed" />
+              {appeal.status !== 'SENT' && <button type="button" onClick={handleSubmitAppeal} disabled={appealBusy} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">Mark appeal submitted</button>}
+              {appeal.status !== 'SENT' && <p className="text-[11px] text-slate-500">This records the workflow status only; no payer transmission is connected.</p>}
+            </section>;
+          })()}
         </div>
       )}
 

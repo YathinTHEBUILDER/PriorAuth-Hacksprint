@@ -1,8 +1,11 @@
+import 'dotenv/config';
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import prisma from '../prisma.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'prior-auth-jwt-secret-key-production-ready-2026';
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production'
+  ? (() => { throw new Error('JWT_SECRET must be configured in production.'); })()
+  : 'local-development-only-change-before-deployment');
 
 export interface AuthUser {
   id: string;

@@ -4,7 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -26,6 +26,7 @@ model User {
   statusChanges      RequestStatusHistory[]
   notifications      Notification[]
   auditLogs          AuditLog[]
+  appeals            Appeal[]
 }
 
 model Organization {
@@ -145,6 +146,7 @@ model AuthorizationRequest {
   reviews                RequestReview[]
   statusHistory          RequestStatusHistory[]
   auditLogs              AuditLog[]
+  appeals                Appeal[]
 }
 
 model ClinicalInformation {
@@ -189,6 +191,7 @@ model Document {
   uploadedBy       User?                @relation("UserDocuments", fields: [uploadedById], references: [id])
   extractedFields  ExtractedField[]
   requirementResults RequestRequirementResult[]
+  denialAppeals    Appeal[]
 }
 
 model ExtractedField {
@@ -199,6 +202,8 @@ model ExtractedField {
   fieldValue       String
   confidence       Float    @default(0.85)
   sourceSnippet    String
+  sourceOffsetStart Int?
+  sourceOffsetEnd   Int?
   isVerified       Boolean  @default(false)
   verifiedValue    String?
   verifiedByUserId String?
@@ -207,6 +212,23 @@ model ExtractedField {
 
   document         Document             @relation(fields: [documentId], references: [id], onDelete: Cascade)
   request          AuthorizationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+}
+
+model Appeal {
+  id               String   @id @default(uuid())
+  requestId        String
+  denialDocumentId String?
+  denialReasonText String
+  matchedFields    String   @default("[]")
+  draftText        String   @default("")
+  status           String   @default("DRAFT") // DRAFT, READY, SENT
+  createdById      String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  request        AuthorizationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  denialDocument Document?            @relation(fields: [denialDocumentId], references: [id], onDelete: SetNull)
+  createdBy      User                 @relation(fields: [createdById], references: [id])
 }
 
 model RequestRequirementResult {

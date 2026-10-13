@@ -107,6 +107,7 @@ export async function getRequestById(req: Request, res: Response): Promise<void>
           changedBy: { select: { id: true, fullName: true, role: true } },
         },
       },
+      appeals: { orderBy: { createdAt: 'desc' } },
     },
   });
 

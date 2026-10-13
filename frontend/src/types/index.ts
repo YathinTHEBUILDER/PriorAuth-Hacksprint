@@ -11,10 +11,12 @@ export type RequestStatus =
   | 'APPROVED'
   | 'DENIED'
   | 'ADDITIONAL_INFO_REQUESTED'
+  | 'APPEALING'
   | 'CANCELLED';
 
 export type DocumentCategory =
   | 'CLINICAL_NOTES'
+  | 'DENIAL_LETTER'
   | 'DIAGNOSIS_RECORDS'
   | 'LABORATORY_REPORTS'
   | 'IMAGING_REPORTS'
@@ -201,6 +203,7 @@ export interface AuthorizationRequestDetail {
   completeness?: CompletenessResult;
   statusHistory: StatusHistoryItem[];
   reviews: ReviewItem[];
+  appeals?: Array<{ id: string; draftText: string; status: string; denialReasonText: string; createdAt: string }>;
 }
 
 export interface NotificationItem {

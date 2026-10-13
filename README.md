@@ -38,10 +38,20 @@ The **Prior Authorization Assistant** automates the end-to-end prior authorizati
   - **Runtime**: Node.js v24 (ES Modules)
   - **Framework**: Express.js with TypeScript & REST architecture
   - **ORM**: Prisma ORM v5
-  - **Database**: SQLite (Zero-configuration out-of-the-box local execution) / PostgreSQL compatible
+  - **Database**: Supabase-hosted PostgreSQL through Prisma; the browser does not connect directly to patient tables
   - **Document Processing**: `pdf-parse` for text extraction & `pdfkit` for high-resolution PDF generation
   - **Security**: JWT session tokens via secure cookies, bcrypt password hashing, role-based access control (RBAC), centralized error handling
   - **Testing**: Vitest automated test suite
+
+---
+
+## Supabase setup
+
+The API uses the Supabase project's PostgreSQL database as its persistent store. The initial schema and private document bucket migrations in `supabase/migrations/` have been applied to the `priorauth` project for this workspace. Set `DATABASE_URL` in the backend environment to the project's direct Postgres connection string from **Project Settings → Database → Connection string**. Copy `.env.example` to the backend's `.env`, replace the database password, set a unique `JWT_SECRET`, add the server-only service role key for private file storage, and run `npm run prisma:seed` before starting the API. Never put a database password or Supabase secret key in frontend `VITE_` variables.
+
+The migration enables row-level security on every public table and revokes Data API access from `anon` and `authenticated`; the Express API uses its server-only database connection after its existing authentication middleware. Uploaded originals go to a private Supabase Storage bucket and are retrieved through authenticated API routes. Keep the service role key in the backend environment. Payer submissions and appeal submissions remain clearly marked prototype simulations.
+
+This build also includes source-verified extraction citations with character offsets, the full request registry as a status-filterable triage queue with days-open sorting, denial-letter uploads, and an appeal draft workflow that reuses extracted chart evidence.
 
 ---
 

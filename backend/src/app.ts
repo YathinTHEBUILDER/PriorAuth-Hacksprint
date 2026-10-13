@@ -1,7 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import path from 'path';
 import apiRouter from './routes/api.js';
 
 const app = express();
@@ -25,10 +24,6 @@ app.use(
 app.use(cookieParser());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
-
-// Static uploads serving
-const uploadsDir = path.resolve(process.cwd(), 'uploads');
-app.use('/uploads', express.static(uploadsDir));
 
 // Root and Health check endpoints
 app.get(['/', '/health', '/api/health'], (_req, res) => {
