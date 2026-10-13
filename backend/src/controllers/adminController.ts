@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import prisma from '../prisma.js';
 import { recordAuditLog } from '../middleware/audit.js';
+import { groqManager } from '../services/groqService.js';
 
 const adminCreateUserSchema = z.object({
   fullName: z.string().min(2),
@@ -249,4 +250,9 @@ export async function getAuditLogs(req: Request, res: Response): Promise<void> {
   });
 
   res.json({ logs });
+}
+
+export async function getAIEngineStatus(_req: Request, res: Response): Promise<void> {
+  const status = groqManager.getPoolStatus();
+  res.json({ aiEngine: status });
 }

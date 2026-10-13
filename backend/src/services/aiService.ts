@@ -280,43 +280,261 @@ export function extractClinicalInformationDeterministic(documentText: string): A
   };
 }
 
+import { groqManager } from './groqService.js';
+
 /**
- * Main AI extraction service dispatcher
+ * Main AI extraction service dispatcher powered by Groq Multi-Key Failover Pool
  */
 export async function runClinicalExtraction(documentText: string): Promise<AIExtractionResult> {
-  const apiKey = process.env.AI_API_KEY;
-
-  if (!apiKey || apiKey.trim() === '') {
-    // Zero-config deterministic NLP fallback
+  const text = (documentText || '').trim();
+  if (text.length < 15) {
     return extractClinicalInformationDeterministic(documentText);
   }
 
   try {
-    // If external AI key is configured (e.g., Gemini or OpenAI standard API)
-    // Here we can call the API or gracefully fallback if network fails
-    const prompt = `You are a certified healthcare clinical document analyst. Extract prior authorization data strictly from the text provided.
-DO NOT fabricate or guess information. If a field is not explicitly present, omit it.
-Return JSON with keys:
-- patientName (object with value, snippet)
-- dob (object with value, snippet)
-- mrn (object with value, snippet)
-- diagnosis (object with value, snippet)
-- diagnosisCodes (array of objects with code, snippet)
-- requestedService (object with value, snippet)
-- cptCodes (array of objects with code, snippet)
-- symptoms (array of strings)
-- clinicalFindings (string)
-- previousTreatments (array of strings)
-- orderingPhysicianName (string)
-- orderingPhysicianNpi (string)
+    const prompt = `You are an expert HIPAA-compliant clinical documentation analyst extracting information from medical records for Prior Authorization review.
+Analyze the following clinical chart note and extract all relevant clinical facts.
 
-Document text:
-${documentText.substring(0, 8000)}`;
+CRITICAL ANTI-HALLUCINATION RULES:
+1. Every piece of extracted information MUST be grounded directly in the text.
+2. For EVERY field, provide an exact, verbatim quote in "sourceSnippet" copied directly from the text where this fact appears. Do not modify, abbreviate, or correct punctuation in sourceSnippet.
+3. If a field is not present in the document, omit it or set it to null. DO NOT guess or infer unstated facts.
 
-    // In demo environment or if API key is mock, return deterministic engine
-    return extractClinicalInformationDeterministic(documentText);
+Return a JSON object matching this exact schema:
+{
+  "patientName": { "value": "John Doe", "sourceSnippet": "exact quote" },
+  "dob": { "value": "01/01/1980", "sourceSnippet": "exact quote" },
+  "mrn": { "value": "MRN-12345", "sourceSnippet": "exact quote" },
+  "documentDate": { "value": "03/15/2026", "sourceSnippet": "exact quote" },
+  "orderingPhysicianName": { "value": "Dr. Sarah Smith", "sourceSnippet": "exact quote" },
+  "orderingPhysicianNpi": { "value": "1234567890", "sourceSnippet": "exact quote" },
+  "diagnosis": { "value": "Lumbar radiculopathy", "sourceSnippet": "exact quote" },
+  "diagnosisCodes": [
+    { "code": "M54.16", "description": "Radiculopathy, lumbar region", "sourceSnippet": "exact quote" }
+  ],
+  "requestedService": { "value": "Lumbar Spine MRI Without Contrast", "sourceSnippet": "exact quote" },
+  "cptCodes": [
+    { "code": "72148", "description": "MRI lumbar spine without dye", "sourceSnippet": "exact quote" }
+  ],
+  "clinicalFindings": { "value": "Positive straight leg raise on right at 45 degrees", "sourceSnippet": "exact quote" },
+  "symptoms": [
+    { "symptom": "Radiating right leg pain for 8 weeks", "sourceSnippet": "exact quote" }
+  ],
+  "previousTreatments": [
+    { "treatment": "Physical therapy 6 weeks and oral NSAIDs", "sourceSnippet": "exact quote" }
+  ],
+  "contraindications": [
+    { "contraindication": "No red flag signs", "sourceSnippet": "exact quote" }
+  ],
+  "aiSuggestions": [
+    "string advice regarding prior authorization approval or documentation completeness"
+  ]
+}
+
+Document Text:
+"""
+${text.substring(0, 12000)}
+"""`;
+
+    const rawResult = await groqManager.chatCompletionJSON<any>([
+      {
+        role: 'system',
+        content: 'You are an expert clinical NLP extraction engine for health plan prior authorization. Always respond with strict, valid JSON matching the requested schema. Provide verbatim source snippets from the text for every extracted fact.',
+      },
+      {
+        role: 'user',
+        content: prompt,
+      },
+    ]);
+
+    // Anti-hallucination verification helper
+    const verifyFact = (
+      fieldName: string,
+      obj?: { value?: string; sourceSnippet?: string } | null
+    ): ExtractedClinicalFact | undefined => {
+      if (!obj || !obj.value) return undefined;
+      const val = String(obj.value).trim();
+      if (!val) return undefined;
+
+      let snippet = String(obj.sourceSnippet || '').trim();
+      let confidence = 0.96;
+
+      // Anti-hallucination check: is snippet an exact substring?
+      if (snippet && text.includes(snippet)) {
+        confidence = 0.98;
+      } else if (snippet) {
+        // Try case-insensitive lookup
+        const lowerSnippet = snippet.toLowerCase();
+        const lowerText = text.toLowerCase();
+        const foundIdx = lowerText.indexOf(lowerSnippet);
+        if (foundIdx >= 0) {
+          snippet = text.substring(foundIdx, foundIdx + snippet.length);
+          confidence = 0.95;
+        } else {
+          // Snippet was slightly modified by LLM; attempt to find value in text
+          const valIdx = lowerText.indexOf(val.toLowerCase());
+          if (valIdx >= 0) {
+            snippet = text.substring(
+              Math.max(0, valIdx - 20),
+              Math.min(text.length, valIdx + val.length + 30)
+            ).trim();
+            confidence = 0.88;
+          } else {
+            // Potential hallucination or paraphrased fact
+            confidence = 0.55;
+          }
+        }
+      } else {
+        confidence = 0.60;
+      }
+
+      return {
+        fieldName,
+        fieldValue: val,
+        confidence,
+        sourceSnippet: snippet || val,
+      };
+    };
+
+    const allFacts: ExtractedClinicalFact[] = [];
+
+    const patientName = verifyFact('Patient Name', rawResult.patientName);
+    if (patientName) allFacts.push(patientName);
+
+    const dob = verifyFact('Date of Birth', rawResult.dob);
+    if (dob) allFacts.push(dob);
+
+    const mrn = verifyFact('Patient MRN', rawResult.mrn);
+    if (mrn) allFacts.push(mrn);
+
+    const docDate = verifyFact('Document Date', rawResult.documentDate);
+    if (docDate) allFacts.push(docDate);
+
+    const orderingPhysicianName = verifyFact('Ordering Physician', rawResult.orderingPhysicianName);
+    if (orderingPhysicianName) allFacts.push(orderingPhysicianName);
+
+    const orderingPhysicianNpi = verifyFact('Physician NPI', rawResult.orderingPhysicianNpi);
+    if (orderingPhysicianNpi) allFacts.push(orderingPhysicianNpi);
+
+    const diagnosis = verifyFact('Primary Diagnosis / Clinical Impression', rawResult.diagnosis);
+    if (diagnosis) allFacts.push(diagnosis);
+
+    const requestedService = verifyFact('Requested Service / Procedure', rawResult.requestedService);
+    if (requestedService) allFacts.push(requestedService);
+
+    const clinicalFindings = verifyFact('Objective Clinical Findings', rawResult.clinicalFindings);
+    if (clinicalFindings) allFacts.push(clinicalFindings);
+
+    const diagnosisCodes: ExtractedClinicalFact[] = [];
+    if (Array.isArray(rawResult.diagnosisCodes)) {
+      for (const dc of rawResult.diagnosisCodes) {
+        const fact = verifyFact(
+          `Diagnosis Code (${dc.code || 'ICD-10'})`,
+          { value: dc.code ? `${dc.code}${dc.description ? ' - ' + dc.description : ''}` : dc.description, sourceSnippet: dc.sourceSnippet }
+        );
+        if (fact) {
+          diagnosisCodes.push(fact);
+          allFacts.push(fact);
+        }
+      }
+    }
+
+    const cptCodes: ExtractedClinicalFact[] = [];
+    if (Array.isArray(rawResult.cptCodes)) {
+      for (const cpt of rawResult.cptCodes) {
+        const fact = verifyFact(
+          `CPT / Procedure Code`,
+          { value: cpt.code || cpt.value, sourceSnippet: cpt.sourceSnippet }
+        );
+        if (fact) {
+          cptCodes.push(fact);
+          allFacts.push(fact);
+        }
+      }
+    }
+
+    const symptoms: ExtractedClinicalFact[] = [];
+    if (Array.isArray(rawResult.symptoms)) {
+      for (const s of rawResult.symptoms) {
+        const itemVal = typeof s === 'string' ? s : s.symptom || s.value;
+        const itemSnippet = typeof s === 'string' ? s : s.sourceSnippet;
+        const fact = verifyFact('Documented Symptoms', { value: itemVal, sourceSnippet: itemSnippet });
+        if (fact) {
+          symptoms.push(fact);
+          allFacts.push(fact);
+        }
+      }
+    }
+
+    const previousTreatments: ExtractedClinicalFact[] = [];
+    if (Array.isArray(rawResult.previousTreatments)) {
+      for (const pt of rawResult.previousTreatments) {
+        const itemVal = typeof pt === 'string' ? pt : pt.treatment || pt.value;
+        const itemSnippet = typeof pt === 'string' ? pt : pt.sourceSnippet;
+        const fact = verifyFact('Prior Conservative Treatment', { value: itemVal, sourceSnippet: itemSnippet });
+        if (fact) {
+          previousTreatments.push(fact);
+          allFacts.push(fact);
+        }
+      }
+    }
+
+    const contraindications: ExtractedClinicalFact[] = [];
+    if (Array.isArray(rawResult.contraindications)) {
+      for (const c of rawResult.contraindications) {
+        const itemVal = typeof c === 'string' ? c : c.contraindication || c.value;
+        const itemSnippet = typeof c === 'string' ? c : c.sourceSnippet;
+        const fact = verifyFact('Safety Screening / Contraindications', { value: itemVal, sourceSnippet: itemSnippet });
+        if (fact) {
+          contraindications.push(fact);
+          allFacts.push(fact);
+        }
+      }
+    }
+
+    const aiSuggestions: string[] = Array.isArray(rawResult.aiSuggestions)
+      ? rawResult.aiSuggestions.filter((s: any) => typeof s === 'string' && s.length > 5)
+      : [];
+
+    // If any critical demographic or code fact is missing, supplement with deterministic regex pass
+    const deterministic = extractClinicalInformationDeterministic(documentText);
+    if (!cptCodes.length && deterministic.cptCodes.length) {
+      cptCodes.push(...deterministic.cptCodes);
+      allFacts.push(...deterministic.cptCodes);
+    }
+    if (!diagnosisCodes.length && deterministic.diagnosisCodes.length) {
+      diagnosisCodes.push(...deterministic.diagnosisCodes);
+      allFacts.push(...deterministic.diagnosisCodes);
+    }
+    if (!orderingPhysicianNpi && deterministic.orderingPhysicianNpi) {
+      allFacts.push(deterministic.orderingPhysicianNpi);
+    }
+
+    const poolStatus = groqManager.getPoolStatus();
+
+    return {
+      isSimulated: false,
+      engineName: `Groq High-Performance Clinical LLM (${poolStatus.model} - Key #${poolStatus.activeKeyIndex} of ${poolStatus.totalKeys})`,
+      patientName: patientName || deterministic.patientName,
+      dob: dob || deterministic.dob,
+      mrn: mrn || deterministic.mrn,
+      diagnosis: diagnosis || deterministic.diagnosis,
+      diagnosisCodes,
+      requestedService: requestedService || deterministic.requestedService,
+      cptCodes,
+      symptoms,
+      clinicalFindings: clinicalFindings || deterministic.clinicalFindings,
+      previousTreatments,
+      contraindications,
+      orderingPhysicianName: orderingPhysicianName || deterministic.orderingPhysicianName,
+      orderingPhysicianNpi: orderingPhysicianNpi || deterministic.orderingPhysicianNpi,
+      documentDate: docDate || deterministic.documentDate,
+      allFacts,
+      aiSuggestions: aiSuggestions.length ? aiSuggestions : deterministic.aiSuggestions,
+    };
   } catch (error) {
-    console.warn('AI API call failed or timed out. Falling back to deterministic NLP engine:', error);
+    console.warn('⚠️ [Groq AI] Live extraction failed across failover pool. Falling back to deterministic NLP engine:', error);
     return extractClinicalInformationDeterministic(documentText);
   }
 }
+

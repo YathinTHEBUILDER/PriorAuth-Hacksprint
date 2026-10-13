@@ -101,5 +101,6 @@ router.post('/admin/payer-configurations', authenticate, requireRole('ADMINISTRA
 router.patch('/admin/payer-configurations/:id', authenticate, requireRole('ADMINISTRATOR'), adminCtrl.updatePayerConfiguration);
 
 router.get('/admin/audit-logs', authenticate, requireRole('ADMINISTRATOR'), adminCtrl.getAuditLogs);
+router.get('/admin/ai-engine-status', authenticate, adminCtrl.getAIEngineStatus);
 
 export default router;

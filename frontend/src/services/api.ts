@@ -267,4 +267,6 @@ export const adminApi = {
     if (params?.search) query.append('search', params.search);
     return request<{ logs: any[] }>(`/admin/audit-logs?${query.toString()}`);
   },
+  getAIEngineStatus: () =>
+    request<{ aiEngine: any }>('/admin/ai-engine-status'),
 };

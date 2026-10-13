@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma.js';
 import { recordAuditLog } from '../middleware/audit.js';
+import { groqManager } from '../services/groqService.js';
 
 export async function draftAppeal(req: Request, res: Response): Promise<void> {
   const { id: requestId } = req.params;
@@ -43,19 +44,74 @@ export async function draftAppeal(req: Request, res: Response): Promise<void> {
 
   const evidence = matchedFields.map((field) => {
     const verified = field.sourceOffsetStart !== null && field.sourceOffsetEnd !== null;
-    return `- ${field.fieldName}: ${field.fieldValue}${verified ? ` (Source: ${field.document.originalName}, characters ${field.sourceOffsetStart}–${field.sourceOffsetEnd}: “${field.sourceSnippet}”)` : ' (Source quote could not be verified; clinician review required.)'}`;
+    return `- ${field.fieldName}: ${field.fieldValue}${verified ? ` (Source: ${field.document.originalName}, chars ${field.sourceOffsetStart}–${field.sourceOffsetEnd}: “${field.sourceSnippet}”)` : ' (Unverified snippet; clinician review required)'}`;
   });
-  const draftText = [
-    `RE: Appeal of prior authorization denial for ${request.patient.firstName} ${request.patient.lastName}`,
-    `Payer: ${request.payer.name} | Request: ${request.requestNumber}`,
+
+  const deterministicDraft = [
+    `RE: Prior Authorization Denial Appeal - ${request.requestedService}`,
+    `Patient: ${request.patient.firstName} ${request.patient.lastName} | MRN: ${request.patient.mrn} | DOB: ${request.patient.dateOfBirth}`,
+    `Payer: ${request.payer.name} | Request Number: ${request.requestNumber}`,
+    `Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`,
     '',
-    `Denial reason supplied: ${denialReasonText}`,
+    `Dear Appeals Coordinator / Medical Director,`,
     '',
-    'Clinical evidence for clinician review:',
-    ...(evidence.length ? evidence : ['- No matching extracted evidence was found. Add supporting chart documentation before submitting.']),
+    `This letter serves as a formal appeal of the recent denial for ${request.requestedService} regarding the patient referenced above.`,
     '',
-    'Please review this draft against the patient chart, correct any inaccuracies, and add any required clinical context before sending. This draft is not a clinical determination or a transmission to the payer.',
+    `DENIAL REASON CITED:`,
+    `"${denialReasonText}"`,
+    '',
+    `CLINICAL REBUTTAL & SUPPORTING DOCUMENTED EVIDENCE:`,
+    ...(evidence.length ? evidence : ['- No matching extracted evidence found in current documents. Supporting chart notes required.']),
+    '',
+    `Based on the documented clinical history, conservative management, and objective examination findings above, this requested service meets all recognized clinical guidelines for medical necessity. We respectfully request that the denial be overturned immediately.`,
+    '',
+    `Respectfully submitted,`,
+    `Clinical Care & Prior Authorization Team`,
+    '',
+    `[DISCLAIMER: Please review this draft against the patient chart, verify all citations, and append physician signature before submission.]`,
   ].join('\n');
+
+  let draftText = deterministicDraft;
+
+  // Enhance appeal using Groq LLM Failover Pool
+  try {
+    const prompt = `You are an expert healthcare appeal coordinator and medical director specialized in overcoming prior authorization denials.
+Draft a highly persuasive, clinically rigorous, professional Prior Authorization Appeal Letter based on the following case data:
+
+Patient: ${request.patient.firstName} ${request.patient.lastName} (DOB: ${request.patient.dateOfBirth}, MRN: ${request.patient.mrn})
+Payer: ${request.payer.name}
+Prior Authorization Request #: ${request.requestNumber}
+Requested Service: ${request.requestedService}
+Payer Denial Reason: "${denialReasonText}"
+
+Available Documented Chart Evidence & Verified Snippets:
+${evidence.length > 0 ? evidence.join('\n') : 'No extracted snippets available. Argue based on general medical necessity standards for this condition.'}
+
+REQUIREMENTS:
+1. Address the letter to the Medical Review Department at ${request.payer.name}.
+2. Explicitly cite the denial reason and systematically refute it using clinical guidelines and the documented chart evidence.
+3. Incorporate the cited evidence items, including verbatim source document references and findings.
+4. Conclude with an urgent request to overturn the denial or offer a peer-to-peer discussion.
+5. Include a standard clinician review disclaimer at the very end.
+Format cleanly as a ready-to-sign medical letter with clear headings.`;
+
+    const aiGeneratedAppeal = await groqManager.chatCompletion([
+      {
+        role: 'system',
+        content: 'You are an expert physician appeal specialist. Draft compelling, grammatically flawless, authoritative medical necessity appeal letters that directly rebut health plan denials.',
+      },
+      {
+        role: 'user',
+        content: prompt,
+      },
+    ], false, 0.3);
+
+    if (aiGeneratedAppeal && aiGeneratedAppeal.trim().length > 100) {
+      draftText = aiGeneratedAppeal.trim();
+    }
+  } catch (aiErr) {
+    console.warn('⚠️ [Groq AI] Appeal generation fell back to deterministic template:', aiErr);
+  }
 
   const appeal = await prisma.appeal.create({
     data: {
